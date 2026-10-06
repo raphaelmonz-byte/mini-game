@@ -24,7 +24,7 @@ function game() {
   const document = { getElementById: id => elements[id] ??= new Element(), createElementNS: () => new Element(), addEventListener() {}, querySelector: () => ({ value: ability }) };
   const context = { document, performance: { now: () => now }, requestAnimationFrame() {}, setTimeout() {}, clearTimeout() {} };
   vm.createContext(context);
-  const source = fs.readFileSync(path.join(__dirname, '..', 'game.js'), 'utf8').replace('  resetState();\n  requestAnimationFrame(frame);', '  resetState();\n  globalThis.api = {state, frame, startGame, resetState, recruitmentTick, attemptSend, updateLegions, resolveArrival, activateAbility, applyAbility, onRegionClick};');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'game.js'), 'utf8').replace('  resetState();\n  requestAnimationFrame(frame);', '  resetState();\n  globalThis.api = {state, frame, startGame, resetState, recruitmentTick, attemptSend, updateLegions, resolveArrival, activateAbility, applyAbility, onRegionClick, aiTick};');
   vm.runInContext(source, context);
   return { ...context.api, elements, advance: ms => now += ms, choose: value => ability = value };
 }
@@ -83,4 +83,41 @@ test('destroyed last enemy legion does not prevent victory', () => {
   const target = g.state.regions.get('r7');
   g.state.legions.push({targetId:target.id, sourceId:'r6',owner:'enemy', count:1, progress:0,lastUpdate:0,duration:1500,teleport:false,dom:{g:{remove(){}},text:{setAttribute(){}},dot:{setAttribute(){}}}});
   g.advance(500); g.frame(500); assert.equal(g.state.ended,true);
+});
+
+test('all occupied normal fields recruit at the same rate, including after capacity upgrades', () => {
+  const g = game(); g.startGame();
+  for (const r of g.state.regions.values()) { r.owner = 'player'; r.soldiers = 0; }
+  g.state.regions.get('r6').capacity += 15;
+  for (let i = 0; i < 59; i++) g.recruitmentTick(0.05);
+  for (const r of g.state.regions.values()) assert.equal(Math.floor(r.soldiers), 0);
+  g.recruitmentTick(0.051);
+  for (const r of g.state.regions.values()) assert.equal(Math.floor(r.soldiers), 1);
+  g.recruitmentTick(3);
+  for (const r of g.state.regions.values()) assert.equal(Math.floor(r.soldiers), 2);
+});
+test('AI attacks a stronger player start field rather than stalling at full capacity', () => {
+  const g = game(); g.startGame();
+  const source = g.state.regions.get('r2'); source.owner = 'enemy'; source.soldiers = source.capacity;
+  g.state.regions.get('r1').soldiers = 39;
+  g.advance(1800); g.aiTick(1800);
+  assert(g.state.legions.some(l => l.owner === 'enemy' && l.targetId === 'r1'));
+});
+test('AI moves rear reserves toward an owned frontline field', () => {
+  const g = game(); g.startGame();
+  for (const r of g.state.regions.values()) if (r.id !== 'r1') { r.owner = 'enemy'; r.soldiers = 0; }
+  const rear = g.state.regions.get('r12'); rear.soldiers = rear.capacity;
+  g.advance(1800); g.aiTick(1800);
+  assert(g.state.legions.some(l => l.sourceId === 'r12' && ['r8','r11'].includes(l.targetId)));
+});
+test('unassisted AI reaches and attacks the original player start field in each difficulty', () => {
+  for (const difficulty of ['easy', 'medium', 'hard']) {
+    const g = game(); g.state.difficulty = difficulty; g.resetState(); g.startGame();
+    let attacked = false;
+    for (let ms = 50; ms <= 600000 && !attacked; ms += 50) {
+      g.advance(50); g.frame(ms);
+      attacked = g.state.legions.some(l => l.owner === 'enemy' && l.targetId === 'r1');
+    }
+    assert(attacked, `AI must attack player start in ${difficulty}`);
+  }
 });

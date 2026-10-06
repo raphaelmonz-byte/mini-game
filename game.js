@@ -129,7 +129,6 @@
         path: coastline(def.path),
         special: layouts[state.difficulty][def.id] || null,
         capacity: def.cap,
-        isStart: def.owner !== OWNER.NEUTRAL,
         soldiers: def.soldiers,
         owner: def.owner,
         dom: null,
@@ -367,46 +366,63 @@
       }
       if (r.owner === OWNER.NEUTRAL) continue;
       if (r.soldiers >= r.capacity) continue;
-      r.soldiers = Math.min(r.capacity, r.soldiers + (r.isStart ? 1 / 3 : r.capacity / 20) * dtSeconds);
+      r.soldiers = Math.min(r.capacity, r.soldiers + dtSeconds / 3);
     }
+  }
+
+  function distanceToPlayer() {
+    const distances = new Map();
+    const queue = [];
+    for (const r of state.regions.values()) {
+      if (r.owner === OWNER.PLAYER) { distances.set(r.id, 0); queue.push(r); }
+    }
+    for (let i = 0; i < queue.length; i++) {
+      const current = queue[i];
+      for (const next of state.regions.values()) {
+        if (distances.has(next.id) || next.special === 'volcano' || !canTravel(current, next)) continue;
+        distances.set(next.id, distances.get(current.id) + 1);
+        queue.push(next);
+      }
+    }
+    return distances;
   }
 
   function aiTick(now) {
     if (now - state.lastAI < ({ easy:1800, medium:1150, hard:800 }[state.difficulty])) return;
     state.lastAI = now;
-
+    const distances = distanceToPlayer();
     const candidates = [];
     for (const source of state.regions.values()) {
       if (source.owner !== OWNER.ENEMY) continue;
       const available = Math.floor(source.soldiers);
       if (available < 4) continue;
       const send = Math.floor(available * 0.5);
-
+      const fill = source.soldiers / source.capacity;
       for (const target of state.regions.values()) {
-        if (target.id === source.id || !canTravel(source, target)) continue;
-        if (target.owner === OWNER.ENEMY) continue;
+        if (target.id === source.id || target.special === 'volcano' || !canTravel(source, target)) continue;
+        const progress = (distances.get(source.id) ?? 99) - (distances.get(target.id) ?? 99);
+        const incoming = state.legions.filter(l => !l.arrived && l.owner === OWNER.ENEMY && l.targetId === target.id)
+          .reduce((sum, l) => sum + Math.floor(l.count), 0);
+        if (target.owner === OWNER.ENEMY) {
+          // Move reserves toward the front instead of leaving rear fields full.
+          if (progress <= 0 || fill < 0.45 || target.soldiers + incoming >= target.capacity * 0.8) continue;
+          candidates.push({ source, target, score: 10 + progress * 10 + fill * 8 });
+          continue;
+        }
         const defenders = Math.floor(target.soldiers);
-        const advantage = send - defenders;
-        let score = 0;
-        score += target.owner === OWNER.PLAYER ? 26 : 10;
-        score += target.capacity * 0.65;
-        if (target.special === 'volcano') score -= 25;
+        const advantage = send + incoming - defenders;
+        const isPlayer = target.owner === OWNER.PLAYER;
+        // A full field must be allowed to wear down stronger defenders.
+        if (advantage <= 0 && fill < (isPlayer ? 0.55 : 0.72)) continue;
+        if (incoming > defenders + 2) continue;
+        let score = (isPlayer ? 50 : 20) + progress * 18 + Math.max(-15, Math.min(15, advantage));
+        if (target.special === 'volcano') score -= 20;
         if (target.special === 'castle') score -= 8;
-        score += advantage * 2.2;
-        score += source.soldiers / source.capacity > 0.78 ? 12 : 0;
-        if (send <= defenders) score -= 18;
-        score += Math.random() * 10;
-        candidates.push({ source, target, score, advantage });
+        candidates.push({ source, target, score });
       }
     }
-
-    if (!candidates.length) return;
-    candidates.sort((a,b) => b.score - a.score);
-    const choice = candidates[0];
-    const fill = choice.source.soldiers / choice.source.capacity;
-    if (choice.score > 18 && (choice.advantage >= -2 || fill > 0.72)) {
-      attemptSend(choice.source.id, choice.target.id, OWNER.ENEMY);
-    }
+    candidates.sort((a, b) => b.score - a.score);
+    if (candidates.length) attemptSend(candidates[0].source.id, candidates[0].target.id, OWNER.ENEMY);
   }
 
   function refreshRegion(r) {
@@ -485,7 +501,7 @@
     }
     const r = state.regions.get(state.selectedId);
     const ownerLabel = r.owner === OWNER.PLAYER ? 'Du' : r.owner === OWNER.ENEMY ? 'KI' : 'Neutral';
-    const rate = (r.special === 'volcano' ? 0 : r.isStart ? 1 / 3 : r.capacity / 20).toFixed(2).replace('.', ',');
+    const rate = (r.special === 'volcano' ? 0 : 1 / 3).toFixed(2).replace('.', ',');
     el.selectedInfo.innerHTML = `<b>${r.name}</b><br>${ownerLabel} · ${Math.floor(r.soldiers)}/${r.capacity} Soldaten<br>Rekrutierung: ${r.owner === OWNER.NEUTRAL ? '0' : rate} / Sek.${r.special ? `<br><b>${SPECIAL[r.special].icon} ${SPECIAL[r.special].name}</b><br>${SPECIAL[r.special].description}` : ''}`;
   }
 

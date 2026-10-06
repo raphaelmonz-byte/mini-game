@@ -27,9 +27,11 @@ Eine Fähigkeit wird für die Runde gewählt. Sie ist ab Start bereit und nach j
 - **Gefahrenland:** 2 Schreine, 1 Vulkan, 1 Burg.
 - **Feuerland:** 2 Schreine, 3 Vulkane, 2 Burgen, schnellere KI.
 
-Startfelder bleiben normale Felder und produzieren 1 Soldaten alle 3 Sekunden. Andere besetzte normale Felder produzieren Kapazität / 20 Soldaten pro Sekunde. Neutrale Felder produzieren nicht. Automatische Produktion endet an der Kapazität.
+Alle besetzten normalen Felder produzieren unabhängig von ihrer Kapazität 1 Soldaten alle 3 Sekunden. Neutrale Felder produzieren nicht. Automatische Produktion endet an der Kapazität.
 
 Eigene Truppen verstärken eigene Felder bis zur Kapazität, ohne vorhandene überzählige Soldaten zu entfernen. Bei feindlichen oder neutralen Feldern werden Angreifer und Verteidiger gegeneinander verrechnet. Sieg: keine KI-Felder und keine KI-Truppen mehr vorhanden; Niederlage entsprechend für den Spieler.
+
+Die KI erobert Gebiete in Richtung Spieler, verstärkt ihre Front aus dem Hinterland und greift auch stärkere Spielerfelder an, um ihre Verteidigung schrittweise abzubauen.
 
 ## Entwicklung und Tests
 

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Territory Prototype v0.1</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">PROTOTYP v0.1</div>
+        <h1>Territory</h1>
+      </div>
+      <div class="status-cluster">
+        <div class="pill"><span class="dot player-dot"></span><span id="playerRegions">0</span> Regionen</div>
+        <div class="pill"><span class="dot enemy-dot"></span><span id="enemyRegions">0</span> KI-Regionen</div>
+        <div class="pill"><span id="timer">00:00</span></div>
+        <button id="pauseBtn" class="secondary-btn">Pause</button>
+        <button id="restartBtn" class="secondary-btn">Neu starten</button>
+      </div>
+    </header>
+
+    <section class="game-card">
+      <div class="map-wrap" id="mapWrap">
+        <svg id="gameMap" viewBox="0 0 1200 700" role="img" aria-label="Spielkarte mit Regionen">
+          <defs>
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity="0.2"/>
+            </filter>
+            <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="8" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <rect width="1200" height="700" class="map-bg" rx="28"/>
+          <g id="connections"></g>
+          <g id="regions"></g>
+          <g id="legions"></g>
+        </svg>
+
+        <div id="toast" class="toast" aria-live="polite"></div>
+        <div id="overlay" class="overlay hidden">
+          <div class="overlay-card">
+            <div id="overlayKicker" class="eyebrow">SPIELENDE</div>
+            <h2 id="overlayTitle">Sieg</h2>
+            <p id="overlayText"></p>
+            <button id="overlayRestart" class="primary-btn">Noch einmal</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side-panel">
+        <section>
+          <h2>So spielst du</h2>
+          <p>Klicke eine eigene Region an und danach eine angrenzende Region. Alternativ kannst du direkt von einer eigenen Region auf ein Ziel ziehen.</p>
+          <div class="mini-rule"><span>①</span><b>50 %</b> der verfügbaren Soldaten werden entsendet.</div>
+          <div class="mini-rule"><span>②</span>Besetzte Regionen rekrutieren automatisch.</div>
+          <div class="mini-rule"><span>③</span>Erobere alle roten Regionen.</div>
+        </section>
+
+        <section class="legend-section">
+          <h2>Legende</h2>
+          <div class="legend-row"><span class="legend-swatch player"></span><span>Du</span></div>
+          <div class="legend-row"><span class="legend-swatch enemy"></span><span>KI</span></div>
+          <div class="legend-row"><span class="legend-swatch neutral"></span><span>Neutral</span></div>
+          <div class="legend-row"><span class="legend-icon">◉</span><span>Gross: Soldaten</span></div>
+          <div class="legend-row"><span class="legend-icon small">↳</span><span>Klein: Kapazität</span></div>
+        </section>
+
+        <section>
+          <h2>Balance v0.1</h2>
+          <p class="muted">Rekrutierung pro Sekunde = Kapazität ÷ 20. Neutrale Regionen rekrutieren nicht.</p>
+          <div id="selectedInfo" class="selected-info">Wähle eine Region aus.</div>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>

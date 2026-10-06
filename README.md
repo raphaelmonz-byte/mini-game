@@ -6,11 +6,13 @@ Ein Territory-Control-Spiel mit Pergamentkarte, organischen Gebieten und Echtzei
 
 - `index.html` im Browser öffnen; keine Installation erforderlich.
 - Vor Rundenbeginn Schwierigkeit und eine der drei Fähigkeiten wählen, dann „Spiel starten“ anklicken.
-- Ein eigenes grünes Feld und anschließend ein Nachbarfeld anklicken, oder zwischen den Feldern ziehen. Der animierte Pfeil zeigt die Zugrichtung.
+- Ein eigenes grünes Feld und anschließend ein beliebiges Zielfeld anklicken, oder zwischen den Feldern ziehen. Angriffe sind über die ganze Karte erlaubt. Der animierte Pfeil zeigt die Zugrichtung.
 - Es werden 50 % der verfügbaren Soldaten entsendet. Die Runde läuft ohne Pause; „Neu starten“ führt zurück zur Rundenauswahl.
 - Große Zahl: aktive Soldaten. „Kap.“: Feldkapazität. Das Symbol darunter kennzeichnet Spezialfelder.
 
 ## Fähigkeiten
+
+Die aktuelle Oberfläche zeigt **Version 0.4.0**. Grafik und Skript werden mit dieser Versionskennung geladen.
 
 Eine Fähigkeit wird für die Runde gewählt. Sie ist ab Start bereit und nach jedem erfolgreichen Einsatz 60 Sekunden gesperrt. Den Fähigkeitsknopf anklicken und danach ein passendes Zielfeld wählen. Bei jedem Einsatz darf ein anderes Feld gewählt werden. Ein erneuter Klick auf den Fähigkeitsknopf bricht die Zielauswahl ab.
 
@@ -42,3 +44,11 @@ Die Logiktests benötigen Node.js und keine weiteren Pakete:
 ```sh
 node --test tests/game.test.cjs
 ```
+
+Optionale Browserprüfungen für Maus und Touchscreen benötigen Python 3, Playwright und Chromium:
+
+```sh
+node tests/browser-smoke.cjs
+```
+
+`CHROMIUM_PATH` kann einen abweichenden Chromium-Pfad angeben. Diese Prüfungen testen echte Klicks, Touch-Gesten, Ziehpfeile und die Zielfeldwahl für Fähigkeiten.

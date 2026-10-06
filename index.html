@@ -4,14 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Territory – Feldzug</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=0.4.0" />
 </head>
 <body>
   <main class="app-shell">
     <header class="topbar">
       <div>
-        <div class="eyebrow">DER FELDZUG</div>
-        <h1>Territory <span class="title-sub">Reiche im Wandel</span></h1>
+        <div id="roundTitle" class="eyebrow">RUNDE I · GRENZLAND</div>
+        <h1>Territory</h1><span id="buildVersion" class="build-version">Version 0.4.0</span>
       </div>
       <div class="status-cluster">
         <div class="pill"><span class="dot player-dot"></span><span id="playerRegions">0</span> Regionen</div>
@@ -27,6 +27,9 @@
       <div class="map-wrap" id="mapWrap">
         <svg id="gameMap" viewBox="0 0 1200 700" role="img" aria-label="Spielkarte mit Regionen">
           <defs>
+            <radialGradient id="playerFill"><stop stop-color="#57ef31"/><stop offset="1" stop-color="#36ce20"/></radialGradient>
+            <radialGradient id="enemyFill"><stop stop-color="#ff5a51"/><stop offset="1" stop-color="#eb3539"/></radialGradient>
+            <radialGradient id="neutralFill"><stop stop-color="#bca67a"/><stop offset="1" stop-color="#ae9362"/></radialGradient>
             <marker id="arrowHead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#fff1ae"/></marker>
             <marker id="marchHead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="3" markerHeight="3" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#695032"/></marker>
             <pattern id="mapGrid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0 H0 V80" fill="none" stroke="#80643b" stroke-opacity=".12" stroke-width="1"/></pattern>
@@ -41,12 +44,14 @@
           </defs>
           <rect width="1200" height="700" class="map-bg" rx="28"/>
           <rect width="1200" height="700" fill="url(#mapGrid)" pointer-events="none"/>
+          <text x="1130" y="675" class="compass" text-anchor="middle">✥</text>
           <g id="connections"></g>
           <g id="regions"></g>
           <g id="legions"></g>
           <path id="dragArrow" class="drag-arrow hidden" marker-end="url(#arrowHead)"/>
         </svg>
 
+        <div class="field-legend" aria-label="Spezialfelder"><span><i>♨</i> Vulkan</span><span><i>♜</i> Burg</span><span><i>◎</i> Schrein</span></div>
         <div id="toast" class="toast" aria-live="polite"></div>
         <div id="overlay" class="overlay">
           <div class="overlay-card">
@@ -68,9 +73,10 @@
       </div>
 
       <aside class="side-panel">
+        <details class="game-help"><summary>Spielhilfe &amp; Feldregeln</summary>
         <section>
           <h2>So spielst du</h2>
-          <p>Klicke eine eigene Region an und danach eine angrenzende Region. Alternativ kannst du direkt von einer eigenen Region auf ein Ziel ziehen.</p>
+          <p>Klicke eine eigene Region an und danach ein beliebiges Zielfeld. Alternativ kannst du direkt von einer eigenen Region auf ein Ziel ziehen.</p>
           <div class="mini-rule"><span>1</span><div><b>50 %</b> der verfügbaren Soldaten werden entsendet.</div></div>
           <div class="mini-rule"><span>2</span><div>Fähigkeit anklicken, dann das gewünschte Zielfeld.</div></div>
           <div class="mini-rule"><span>3</span><div>Erobere alle roten Regionen. Keine Pause.</div></div>
@@ -91,12 +97,14 @@
           <div class="site-rule"><b>♜ Burg</b><span>−2 angreifende Soldaten / Sek. beim Anmarsch.</span></div>
           <div class="site-rule"><b>◎ Schrein</b><span>Truppen zu einem anderen Schrein teleportieren.</span></div>
           <p class="muted">Jedes besetzte normale Feld: 1 Soldat / 3 Sek., bis zur Kapazität.</p>
-          <div id="selectedInfo" class="selected-info">Wähle eine Region aus.</div>
+
         </section>
+        </details>
       </aside>
     </section>
+    <div id="selectedInfo" class="selected-info">Wähle eine grüne Region aus.</div>
   </main>
 
-  <script src="game.js"></script>
+  <script src="game.js?v=0.4.0"></script>
 </body>
 </html>

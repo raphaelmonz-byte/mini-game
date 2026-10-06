@@ -33,19 +33,62 @@
     hard: { r3: 'shrine', r10: 'shrine', r6: 'volcano', r9: 'volcano', r4: 'volcano', r7: 'castle', r11: 'castle' },
   };
 
-  // Small, repeatable irregularities give each territory an organic coastline.
-  function coastline(path) {
-    const points = [...path.matchAll(/[ML]([\d.]+) ([\d.]+)/g)].map(m => [+m[1], +m[2]]);
-    return points.map(([x, y], i) => {
-      const [nx, ny] = points[(i + 1) % points.length];
-      const length = Math.hypot(nx - x, ny - y);
-      let edge = `${i ? 'L' : 'M'}${x} ${y}`;
-      for (let j = 1; j < 5; j++) {
-        const t = j / 5, wave = Math.sin((i * 4 + j) * 2.4) * 5;
-        edge += ` L${(x + (nx - x) * t - (ny - y) / length * wave).toFixed(1)} ${(y + (ny - y) * t + (nx - x) / length * wave).toFixed(1)}`;
+  // Shared Voronoi borders keep visual territories and their hit areas identical.
+  const mapPositions = [[230,520],[290,330],[335,150],[545,145],[440,525],[490,335],[690,310],[830,155],[640,550],[825,500],[1010,325],[1040,540]];
+  function clipCell(points, nx, ny, limit) {
+    const out = [];
+    for (let i = 0; i < points.length; i++) {
+      const a = points[i], b = points[(i + 1) % points.length];
+      const da = a[0] * nx + a[1] * ny - limit, db = b[0] * nx + b[1] * ny - limit;
+      if (da <= 0.00001) out.push(a);
+      if ((da <= 0) !== (db <= 0)) {
+        const t = da / (da - db);
+        out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
       }
-      return edge;
-    }).join(' ') + ' Z';
+    }
+    return out;
+  }
+
+  function organicEdge(a, b) {
+    const reverse = a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]);
+    const start = reverse ? b : a, end = reverse ? a : b;
+    const dx = end[0] - start[0], dy = end[1] - start[1], length = Math.hypot(dx, dy);
+    if (length < 0.001) return [a, b];
+    const count = Math.max(2, Math.round(length / 13));
+    const seed = start[0] * .13 + start[1] * .09 + end[0] * .07;
+    const points = [];
+    for (let j = 0; j <= count; j++) {
+      const t = j / count;
+      const ripple = Math.sin(Math.PI * t) * (Math.sin(seed + j * 2.1) * 3.5 + Math.sin(j * .8 + seed) * 2);
+      points.push([start[0] + dx * t - dy / length * ripple, start[1] + dy * t + dx / length * ripple]);
+    }
+    return reverse ? points.reverse() : points;
+  }
+
+  function mapPath(points) {
+    const outline = [];
+    for (let i = 0; i < points.length; i++) {
+      const a = points[i].map(n => +n.toFixed(2)), b = points[(i + 1) % points.length].map(n => +n.toFixed(2));
+      outline.push(...organicEdge(a, b).slice(0, -1));
+    }
+    return outline.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`).join(' ') + ' Z';
+  }
+
+  for (let i = 0; i < regionDefs.length; i++) {
+    const [cx, cy] = mapPositions[i];
+    let cell = [[155,160],[245,115],[290,155],[365,115],[395,75],[480,105],[550,75],[625,140],[710,95],[795,130],[845,85],[905,150],[990,125],[1020,210],[1100,235],[1085,315],[1130,390],[1090,450],[1120,530],[1030,570],[1000,625],[910,590],[850,635],[780,595],[705,645],[625,600],[550,650],[460,610],[420,555],[330,585],[245,555],[165,535],[190,465],[150,405],[175,335],[135,250]];
+    for (let j = 0; j < mapPositions.length; j++) {
+      if (j === i) continue;
+      const [x, y] = mapPositions[j];
+      cell = clipCell(cell, x - cx, y - cy, (x*x + y*y - cx*cx - cy*cy) / 2);
+    }
+    let area = 0, labelX = 0, labelY = 0;
+    for (let j = 0; j < cell.length; j++) {
+      const [x1, y1] = cell[j], [x2, y2] = cell[(j + 1) % cell.length];
+      const cross = x1 * y2 - x2 * y1;
+      area += cross; labelX += (x1 + x2) * cross; labelY += (y1 + y2) * cross;
+    }
+    Object.assign(regionDefs[i], { cx: labelX / (3 * area), cy: labelY / (3 * area), path: mapPath(cell) });
   }
 
   const state = {
@@ -65,10 +108,10 @@
     abilityReadyAt: 0,
     targetingAbility: false,
     drag: null,
-    suppressClick: false,
   };
 
   const el = {
+    roundTitle: document.getElementById('roundTitle'),
     map: document.getElementById('gameMap'),
     dragArrow: document.getElementById('dragArrow'),
     setup: document.getElementById('roundSetup'),
@@ -112,7 +155,6 @@
     state.abilityReadyAt = 0;
     state.targetingAbility = false;
     state.drag = null;
-    state.suppressClick = false;
     el.dragArrow.classList.add('hidden');
     el.setup.hidden = false;
     clearTimeout(toastTimer);
@@ -126,7 +168,6 @@
     for (const def of regionDefs) {
       state.regions.set(def.id, {
         ...def,
-        path: coastline(def.path),
         special: layouts[state.difficulty][def.id] || null,
         capacity: def.cap,
         soldiers: def.soldiers,
@@ -166,13 +207,14 @@
       const name = svg('text', { x:region.cx, y:region.cy+64, class:'region-name' });
       name.textContent = region.name;
 
-      const specialIcon = svg('text', { x:region.cx, y:region.cy+48, class:'special-icon' });
+      const specialIcon = svg('text', { x:region.cx, y:region.cy+55, class:'special-icon' });
       specialIcon.textContent = SPECIAL[region.special]?.icon || '';
       const title = svg('title');
       title.textContent = region.special ? `${SPECIAL[region.special].name}: ${SPECIAL[region.special].description}` : region.name;
       g.append(title, border, path, labelBg, soldiers, capacity, specialIcon, name);
       g.addEventListener('pointerdown', (e) => onRegionPointerDown(e, region.id));
-      g.addEventListener('click', (e) => onRegionClick(e, region.id));
+      // Pointer taps are handled on release; keyboard/assistive clicks use detail 0.
+      g.addEventListener('click', (e) => { if (e.detail === 0) onRegionClick(e, region.id); });
       g.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRegionClick(e, region.id); }
       });
@@ -181,12 +223,22 @@
     }
   }
 
+  function regionAt(clientX, clientY) {
+    const matrix = el.map.getScreenCTM();
+    if (!matrix) return null;
+    const point = new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse());
+    // Hit test actual SVG geometry, regardless of pointer capture or overlay arrows.
+    const regions = [...state.regions.values()].reverse();
+    return regions.find(r => r.dom.path.isPointInFill(point) || r.dom.path.isPointInStroke(point)) || null;
+  }
+
   function onRegionPointerDown(e, id) {
-    if (!state.started || state.ended || e.button !== 0) return;
+    if (!state.started || state.ended || e.button !== 0 || state.drag) return;
     const r = state.regions.get(id);
-    if (state.targetingAbility || r.owner !== OWNER.PLAYER) return;
     state.pointerSourceId = id;
-    state.drag = { id, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+    state.drag = { id, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false,
+      canDrag: !state.targetingAbility && r.owner === OWNER.PLAYER };
+    e.preventDefault();
     e.currentTarget.setPointerCapture?.(e.pointerId);
   }
 
@@ -195,11 +247,13 @@
     if (!drag || drag.pointerId !== e.pointerId) return;
     if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6 && !drag.moved) return;
     drag.moved = true;
+    if (!drag.canDrag) return;
     selectRegion(drag.id);
     const source = state.regions.get(drag.id);
-    const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(el.map.getScreenCTM().inverse());
-    const targetId = document.elementFromPoint(e.clientX, e.clientY)?.closest('.region-group')?.getAttribute('data-id');
-    const target = state.regions.get(targetId);
+    const matrix = el.map.getScreenCTM();
+    if (!matrix) return;
+    const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(matrix.inverse());
+    const target = regionAt(e.clientX, e.clientY);
     const valid = target && target.id !== source.id && canTravel(source, target);
     el.dragArrow.setAttribute('d', `M${source.cx} ${source.cy} L${point.x} ${point.y}`);
     el.dragArrow.classList.remove('hidden');
@@ -209,25 +263,25 @@
   function finishDrag(e, cancelled = false) {
     if (!state.drag || state.drag.pointerId !== e.pointerId) return;
     const drag = state.drag;
-    if (drag.moved) {
-      state.suppressClick = true;
-      setTimeout(() => { state.suppressClick = false; }, 0);
-      const id = document.elementFromPoint(e.clientX, e.clientY)?.closest('.region-group')?.getAttribute('data-id');
-      if (!cancelled && id && id !== drag.id) attemptSend(drag.id, id, OWNER.PLAYER);
-      clearSelection();
-    }
+    const target = regionAt(e.clientX, e.clientY);
     state.drag = null;
     state.pointerSourceId = null;
     el.dragArrow.classList.add('hidden');
+    if (cancelled || !state.started || state.ended) return;
+    if (drag.moved && drag.canDrag) {
+      if (target && target.id !== drag.id) attemptSend(drag.id, target.id, OWNER.PLAYER);
+      clearSelection();
+    } else if (!drag.moved && target?.id === drag.id) {
+      onRegionClick(e, target.id);
+    }
   }
 
   function canTravel(source, target) {
-    return source.neighbors.includes(target.id) || (source.special === 'shrine' && target.special === 'shrine');
+    return source.id !== target.id;
   }
 
   function onRegionClick(_e, id) {
     if (!state.started || state.ended) return;
-    if (state.suppressClick) return;
     const clicked = state.regions.get(id);
     if (state.targetingAbility) { applyAbility(clicked); return; }
 
@@ -284,7 +338,7 @@
     if (!canTravel(source, target)) {
       if (owner === OWNER.PLAYER) {
         flashInvalid(targetId);
-        showToast('Wähle ein Nachbarfeld oder verbinde zwei Schreine.');
+        showToast('Wähle ein anderes Zielfeld.');
       }
       return false;
     }
@@ -371,20 +425,10 @@
   }
 
   function distanceToPlayer() {
-    const distances = new Map();
-    const queue = [];
-    for (const r of state.regions.values()) {
-      if (r.owner === OWNER.PLAYER) { distances.set(r.id, 0); queue.push(r); }
-    }
-    for (let i = 0; i < queue.length; i++) {
-      const current = queue[i];
-      for (const next of state.regions.values()) {
-        if (distances.has(next.id) || next.special === 'volcano' || !canTravel(current, next)) continue;
-        distances.set(next.id, distances.get(current.id) + 1);
-        queue.push(next);
-      }
-    }
-    return distances;
+    const players = [...state.regions.values()].filter(r => r.owner === OWNER.PLAYER);
+    return new Map([...state.regions.values()].map(r => [r.id,
+      players.length ? Math.min(...players.map(p => Math.hypot(r.cx - p.cx, r.cy - p.cy) / 200)) : 99
+    ]));
   }
 
   function aiTick(now) {
@@ -413,9 +457,9 @@
         const advantage = send + incoming - defenders;
         const isPlayer = target.owner === OWNER.PLAYER;
         // A full field must be allowed to wear down stronger defenders.
-        if (advantage <= 0 && fill < (isPlayer ? 0.55 : 0.72)) continue;
+        if (advantage <= 0 && fill < (isPlayer ? 0.85 : 0.72)) continue;
         if (incoming > defenders + 2) continue;
-        let score = (isPlayer ? 50 : 20) + progress * 18 + Math.max(-15, Math.min(15, advantage));
+        let score = (isPlayer ? (fill >= 0.85 ? 150 : 50) : 20) + progress * 18 + Math.max(-15, Math.min(15, advantage));
         if (target.special === 'volcano') score -= 20;
         if (target.special === 'castle') score -= 8;
         candidates.push({ source, target, score });
@@ -480,6 +524,7 @@
     }
     el.playerRegions.textContent = playerCount;
     el.enemyRegions.textContent = enemyCount;
+    el.roundTitle.textContent = { easy:'RUNDE I · GRENZLAND', medium:'RUNDE II · GEFAHRENLAND', hard:'RUNDE III · FEUERLAND' }[state.difficulty];
     el.territoryBar.style.setProperty('--player-share', `${playerCount / state.regions.size * 100}%`);
     el.territoryBar.style.setProperty('--enemy-share', `${enemyCount / state.regions.size * 100}%`);
     const ability = ABILITIES[state.ability];

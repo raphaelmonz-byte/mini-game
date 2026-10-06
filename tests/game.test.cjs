@@ -36,11 +36,12 @@ test('waiting screen freezes production, AI, timer; start fields recruit every t
   for (const [id, expected] of [['r1', 19], ['r8', 19], ['r12', 25]]) assert.equal(g.state.regions.get(id).soldiers, expected);
   for (const r of g.state.regions.values()) assert.equal(r.dom.capacity.textContent, `Kap. ${r.capacity}`);
 });
-test('two clicks select a player field and send soldiers to neutral and hostile neighbors', () => {
+test('two clicks send soldiers to neutral, hostile and distant fields', () => {
   const g = game(); g.startGame(); g.onRegionClick({}, 'r1'); assert.equal(g.state.selectedId, 'r1');
   g.onRegionClick({}, 'r2'); assert.equal(g.state.legions.length, 1); assert.equal(g.state.regions.get('r1').soldiers, 9);
   g.state.regions.get('r5').owner = 'enemy'; g.onRegionClick({}, 'r1'); g.onRegionClick({}, 'r5'); assert.equal(g.state.legions.length, 2);
-  assert.equal(g.attemptSend('r1', 'r12', 'player'), false);
+  assert.equal(g.attemptSend('r1', 'r12', 'player'), true);
+  assert.equal(g.state.legions.length, 3);
 });
 test('difficulty adds 2, 4, 7 special fields while protecting start fields and pairing shrines', () => {
   const g = game(); for (const [difficulty, count] of [['easy',2],['medium',4],['hard',7]]) {
@@ -108,7 +109,10 @@ test('AI moves rear reserves toward an owned frontline field', () => {
   for (const r of g.state.regions.values()) if (r.id !== 'r1') { r.owner = 'enemy'; r.soldiers = 0; }
   const rear = g.state.regions.get('r12'); rear.soldiers = rear.capacity;
   g.advance(1800); g.aiTick(1800);
-  assert(g.state.legions.some(l => l.sourceId === 'r12' && ['r8','r11'].includes(l.targetId)));
+  assert(g.state.legions.some(l => l.sourceId === 'r12' && l.targetId !== 'r12'));
+  const destination = g.state.regions.get(g.state.legions[0].targetId);
+  const player = g.state.regions.get('r1');
+  assert(Math.hypot(destination.cx-player.cx,destination.cy-player.cy) < Math.hypot(rear.cx-player.cx,rear.cy-player.cy));
 });
 test('unassisted AI reaches and attacks the original player start field in each difficulty', () => {
   for (const difficulty of ['easy', 'medium', 'hard']) {

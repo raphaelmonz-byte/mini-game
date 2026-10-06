@@ -17,6 +17,37 @@
     { id:'r12', name:'Kronland', cx:989, cy:465, cap:36, soldiers:24, owner:OWNER.ENEMY, neighbors:['r8','r11'], path:'M858 391 L918 357 L1005 365 L1080 410 L1115 472 L1085 536 L1018 572 L934 558 L880 514 L855 453 Z' },
   ];
 
+  const SPECIAL = {
+    volcano: { icon: '♨', name: 'Vulkan', description: 'Verliert 1 Soldaten pro Sekunde bis 0; keine Rekrutierung.' },
+    castle: { icon: '♜', name: 'Burg', description: 'Vernichtet 2 angreifende Soldaten pro Sekunde während des Anmarschs.' },
+    shrine: { icon: '◎', name: 'Schrein', description: 'Truppen können zu jedem anderen Schrein teleportieren.' },
+  };
+  const ABILITIES = {
+    capacity: { name: 'Ausbau', icon: '♜', description: '+15 Kapazität auf einem eigenen Feld.' },
+    reinforcement: { name: 'Verstärkung', icon: '✚', description: '+15 Soldaten auf einem eigenen Feld, auch über die Kapazität hinaus.' },
+    strike: { name: 'Schlag', icon: 'ϟ', description: '−15 Soldaten auf einem feindlichen Feld, mindestens 0.' },
+  };
+  const layouts = {
+    easy: { r3: 'shrine', r10: 'shrine' },
+    medium: { r3: 'shrine', r10: 'shrine', r6: 'volcano', r7: 'castle' },
+    hard: { r3: 'shrine', r10: 'shrine', r6: 'volcano', r9: 'volcano', r4: 'volcano', r7: 'castle', r11: 'castle' },
+  };
+
+  // Small, repeatable irregularities give each territory an organic coastline.
+  function coastline(path) {
+    const points = [...path.matchAll(/[ML]([\d.]+) ([\d.]+)/g)].map(m => [+m[1], +m[2]]);
+    return points.map(([x, y], i) => {
+      const [nx, ny] = points[(i + 1) % points.length];
+      const length = Math.hypot(nx - x, ny - y);
+      let edge = `${i ? 'L' : 'M'}${x} ${y}`;
+      for (let j = 1; j < 5; j++) {
+        const t = j / 5, wave = Math.sin((i * 4 + j) * 2.4) * 5;
+        edge += ` L${(x + (nx - x) * t - (ny - y) / length * wave).toFixed(1)} ${(y + (ny - y) * t + (nx - x) / length * wave).toFixed(1)}`;
+      }
+      return edge;
+    }).join(' ') + ' Z';
+  }
+
   const state = {
     regions: new Map(),
     legions: [],
@@ -29,9 +60,21 @@
     lastFrame: performance.now(),
     lastAI: 0,
     legionSeq: 1,
+    difficulty: 'easy',
+    ability: 'capacity',
+    abilityReadyAt: 0,
+    targetingAbility: false,
+    drag: null,
+    suppressClick: false,
   };
 
   const el = {
+    map: document.getElementById('gameMap'),
+    dragArrow: document.getElementById('dragArrow'),
+    setup: document.getElementById('roundSetup'),
+    difficulty: document.getElementById('difficulty'),
+    abilityBtn: document.getElementById('abilityBtn'),
+    territoryBar: document.getElementById('territoryBar'),
     regions: document.getElementById('regions'),
     legions: document.getElementById('legions'),
     connections: document.getElementById('connections'),
@@ -66,6 +109,12 @@
     state.lastFrame = performance.now();
     state.lastAI = 0;
     state.legionSeq = 1;
+    state.abilityReadyAt = 0;
+    state.targetingAbility = false;
+    state.drag = null;
+    state.suppressClick = false;
+    el.dragArrow.classList.add('hidden');
+    el.setup.hidden = false;
     clearTimeout(toastTimer);
     el.toast.classList.remove('show');
     el.overlayKicker.textContent = 'BEREIT?';
@@ -77,8 +126,10 @@
     for (const def of regionDefs) {
       state.regions.set(def.id, {
         ...def,
+        path: coastline(def.path),
+        special: layouts[state.difficulty][def.id] || null,
         capacity: def.cap,
-        recruitmentRate: def.owner === OWNER.NEUTRAL ? def.cap / 20 : 1 / 3,
+        isStart: def.owner !== OWNER.NEUTRAL,
         soldiers: def.soldiers,
         owner: def.owner,
         dom: null,
@@ -108,16 +159,20 @@
 
     for (const region of state.regions.values()) {
       const g = svg('g', { class:'region-group', 'data-id':region.id, tabindex:'0', role:'button', 'aria-label':region.name });
+      const border = svg('path', { d: region.path, class: 'region-border' });
       const path = svg('path', { d:region.path, class:`region-shape owner-${region.owner}` });
-      const labelBg = svg('circle', { cx:region.cx, cy:region.cy-5, r:38, class:'region-label-bg' });
-      const soldiers = svg('text', { x:region.cx, y:region.cy-12, class:'region-soldiers' });
-      const capacity = svg('text', { x:region.cx, y:region.cy+27, class:'region-capacity' });
-      const name = svg('text', { x:region.cx, y:region.cy+56, class:'region-name' });
+      const labelBg = svg('circle', { cx:region.cx, cy:region.cy-10, r:25, class:'region-label-bg' });
+      const soldiers = svg('text', { x:region.cx, y:region.cy-10, class:'region-soldiers' });
+      const capacity = svg('text', { x:region.cx, y:region.cy+24, class:'region-capacity' });
+      const name = svg('text', { x:region.cx, y:region.cy+64, class:'region-name' });
       name.textContent = region.name;
 
-      g.append(path, labelBg, soldiers, capacity, name);
+      const specialIcon = svg('text', { x:region.cx, y:region.cy+48, class:'special-icon' });
+      specialIcon.textContent = SPECIAL[region.special]?.icon || '';
+      const title = svg('title');
+      title.textContent = region.special ? `${SPECIAL[region.special].name}: ${SPECIAL[region.special].description}` : region.name;
+      g.append(title, border, path, labelBg, soldiers, capacity, specialIcon, name);
       g.addEventListener('pointerdown', (e) => onRegionPointerDown(e, region.id));
-      g.addEventListener('pointerup', (e) => onRegionPointerUp(e, region.id));
       g.addEventListener('click', (e) => onRegionClick(e, region.id));
       g.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRegionClick(e, region.id); }
@@ -128,28 +183,54 @@
   }
 
   function onRegionPointerDown(e, id) {
-    if (!state.started || state.ended) return;
+    if (!state.started || state.ended || e.button !== 0) return;
     const r = state.regions.get(id);
-    if (r.owner === OWNER.PLAYER) {
-      state.pointerSourceId = id;
-      selectRegion(id);
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-    } else {
-      state.pointerSourceId = null;
-    }
+    if (state.targetingAbility || r.owner !== OWNER.PLAYER) return;
+    state.pointerSourceId = id;
+    state.drag = { id, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
   }
 
-  function onRegionPointerUp(_e, id) {
-    if (!state.started || state.ended) return;
-    if (!state.pointerSourceId || state.pointerSourceId === id) return;
-    const sourceId = state.pointerSourceId;
+  function moveDrag(e) {
+    const drag = state.drag;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6 && !drag.moved) return;
+    drag.moved = true;
+    selectRegion(drag.id);
+    const source = state.regions.get(drag.id);
+    const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(el.map.getScreenCTM().inverse());
+    const targetId = document.elementFromPoint(e.clientX, e.clientY)?.closest('.region-group')?.getAttribute('data-id');
+    const target = state.regions.get(targetId);
+    const valid = target && target.id !== source.id && canTravel(source, target);
+    el.dragArrow.setAttribute('d', `M${source.cx} ${source.cy} L${point.x} ${point.y}`);
+    el.dragArrow.classList.remove('hidden');
+    el.dragArrow.classList.toggle('invalid', !valid);
+  }
+
+  function finishDrag(e, cancelled = false) {
+    if (!state.drag || state.drag.pointerId !== e.pointerId) return;
+    const drag = state.drag;
+    if (drag.moved) {
+      state.suppressClick = true;
+      setTimeout(() => { state.suppressClick = false; }, 0);
+      const id = document.elementFromPoint(e.clientX, e.clientY)?.closest('.region-group')?.getAttribute('data-id');
+      if (!cancelled && id && id !== drag.id) attemptSend(drag.id, id, OWNER.PLAYER);
+      clearSelection();
+    }
+    state.drag = null;
     state.pointerSourceId = null;
-    attemptSend(sourceId, id, OWNER.PLAYER);
+    el.dragArrow.classList.add('hidden');
+  }
+
+  function canTravel(source, target) {
+    return source.neighbors.includes(target.id) || (source.special === 'shrine' && target.special === 'shrine');
   }
 
   function onRegionClick(_e, id) {
     if (!state.started || state.ended) return;
+    if (state.suppressClick) return;
     const clicked = state.regions.get(id);
+    if (state.targetingAbility) { applyAbility(clicked); return; }
 
     if (!state.selectedId) {
       if (clicked.owner === OWNER.PLAYER) selectRegion(id);
@@ -163,7 +244,7 @@
     }
 
     const selected = state.regions.get(state.selectedId);
-    if (clicked.owner === OWNER.PLAYER && !selected.neighbors.includes(id)) {
+    if (clicked.owner === OWNER.PLAYER && !canTravel(selected, clicked)) {
       selectRegion(id);
       return;
     }
@@ -191,17 +272,20 @@
     if (!state.selectedId) return;
     const source = state.regions.get(state.selectedId);
     source.dom.g.classList.add('selected');
-    for (const nId of source.neighbors) state.regions.get(nId).dom.g.classList.add('valid-target');
+    for (const target of state.regions.values()) {
+      if (target.id !== source.id && canTravel(source, target)) target.dom.g.classList.add('valid-target');
+    }
   }
 
   function attemptSend(sourceId, targetId, owner) {
+    if (!state.started || state.ended) return false;
     const source = state.regions.get(sourceId);
     const target = state.regions.get(targetId);
     if (!source || !target || source.owner !== owner) return false;
-    if (!source.neighbors.includes(targetId)) {
+    if (!canTravel(source, target)) {
       if (owner === OWNER.PLAYER) {
         flashInvalid(targetId);
-        showToast('Diese Regionen grenzen nicht aneinander.');
+        showToast('Wähle ein Nachbarfeld oder verbinde zwei Schreine.');
       }
       return false;
     }
@@ -223,18 +307,19 @@
     const dx = target.cx - source.cx;
     const dy = target.cy - source.cy;
     const distance = Math.hypot(dx, dy);
-    const duration = Math.max(850, distance / 0.16); // ms
+    const teleport = source.special === 'shrine' && target.special === 'shrine';
+    const duration = teleport ? 450 : Math.max(850, distance / 0.16);
     const now = performance.now();
     const legion = {
       id: state.legionSeq++, sourceId:source.id, targetId:target.id,
-      owner, count, start:now, duration,
+      owner, count, start:now, duration, teleport, progress:0, lastUpdate:now,
       x:source.cx, y:source.cy, arrived:false, dom:null,
     };
 
     const g = svg('g');
     const line = svg('line', {
       x1:source.cx, y1:source.cy, x2:target.cx, y2:target.cy,
-      class:'legion-line', stroke: owner === OWNER.PLAYER ? '#29c862' : '#f04f54'
+      class: teleport ? 'legion-line teleport-line' : 'legion-line', 'marker-end':'url(#marchHead)', stroke: owner === OWNER.PLAYER ? '#29c862' : '#f04f54'
     });
     const dot = svg('circle', {
       cx:source.cx, cy:source.cy, r:18, class:'legion-dot',
@@ -250,18 +335,19 @@
 
   function resolveArrival(legion) {
     const target = state.regions.get(legion.targetId);
-    if (!target) return;
+    if (!target || legion.count < 1) return;
+    const count = Math.floor(legion.count);
 
     if (target.owner === legion.owner) {
-      target.soldiers = Math.min(target.capacity, target.soldiers + legion.count);
+      target.soldiers = Math.max(target.soldiers, Math.min(target.capacity, target.soldiers + count));
     } else {
       const defenders = Math.floor(target.soldiers);
-      if (legion.count > defenders) {
+      if (count > defenders) {
         target.owner = legion.owner;
-        target.soldiers = legion.count - defenders;
+        target.soldiers = Math.min(target.capacity, count - defenders);
         if (legion.owner === OWNER.PLAYER) showToast(`${target.name} erobert.`);
-      } else if (legion.count < defenders) {
-        target.soldiers = defenders - legion.count;
+      } else if (count < defenders) {
+        target.soldiers = defenders - count;
       } else {
         target.owner = OWNER.NEUTRAL;
         target.soldiers = 0;
@@ -275,14 +361,18 @@
 
   function recruitmentTick(dtSeconds) {
     for (const r of state.regions.values()) {
+      if (r.special === 'volcano') {
+        r.soldiers = Math.max(0, r.soldiers - dtSeconds);
+        continue;
+      }
       if (r.owner === OWNER.NEUTRAL) continue;
-      if (r.soldiers >= r.capacity) { r.soldiers = r.capacity; continue; }
-      r.soldiers = Math.min(r.capacity, r.soldiers + r.recruitmentRate * dtSeconds);
+      if (r.soldiers >= r.capacity) continue;
+      r.soldiers = Math.min(r.capacity, r.soldiers + (r.isStart ? 1 / 3 : r.capacity / 20) * dtSeconds);
     }
   }
 
   function aiTick(now) {
-    if (now - state.lastAI < 1150) return;
+    if (now - state.lastAI < ({ easy:1800, medium:1150, hard:800 }[state.difficulty])) return;
     state.lastAI = now;
 
     const candidates = [];
@@ -292,14 +382,16 @@
       if (available < 4) continue;
       const send = Math.floor(available * 0.5);
 
-      for (const nId of source.neighbors) {
-        const target = state.regions.get(nId);
+      for (const target of state.regions.values()) {
+        if (target.id === source.id || !canTravel(source, target)) continue;
         if (target.owner === OWNER.ENEMY) continue;
         const defenders = Math.floor(target.soldiers);
         const advantage = send - defenders;
         let score = 0;
         score += target.owner === OWNER.PLAYER ? 26 : 10;
         score += target.capacity * 0.65;
+        if (target.special === 'volcano') score -= 25;
+        if (target.special === 'castle') score -= 8;
         score += advantage * 2.2;
         score += source.soldiers / source.capacity > 0.78 ? 12 : 0;
         if (send <= defenders) score -= 18;
@@ -319,10 +411,10 @@
 
   function refreshRegion(r) {
     const ownerClass = `owner-${r.owner}`;
-    r.dom.path.setAttribute('class', `region-shape ${ownerClass}`);
+    r.dom.path.setAttribute('class', `region-shape ${ownerClass} ${r.special || ''}`);
     r.dom.soldiers.textContent = Math.floor(r.soldiers);
     r.dom.capacity.textContent = `Kap. ${r.capacity}`;
-    r.dom.g.setAttribute('aria-label', `${r.name}: ${Math.floor(r.soldiers)} Soldaten, Kapazität ${r.capacity}`);
+    r.dom.g.setAttribute('aria-label', `${r.name}: ${Math.floor(r.soldiers)} Soldaten, Kapazität ${r.capacity}${r.special ? ', ' + SPECIAL[r.special].name : ''}`);
   }
 
   function refreshAll() {
@@ -335,9 +427,18 @@
   function updateLegions(now) {
     for (const legion of state.legions) {
       if (legion.arrived) continue;
-      const t = Math.min(1, (now - legion.start) / legion.duration);
+      const step = Math.max(0, now - legion.lastUpdate);
+      const travelStep = Math.min(step, Math.max(0, 1 - legion.progress) * legion.duration);
+      legion.progress += step / legion.duration;
+      legion.lastUpdate = now;
+      const t = Math.min(1, legion.progress);
       const source = state.regions.get(legion.sourceId);
       const target = state.regions.get(legion.targetId);
+      if (target.special === 'castle' && target.owner !== legion.owner && !legion.teleport) {
+        legion.count = Math.max(0, legion.count - 2 * travelStep / 1000);
+        legion.dom.text.textContent = Math.floor(legion.count);
+        if (legion.count < 1) { legion.arrived = true; legion.dom.g.remove(); continue; }
+      }
       const eased = t < .5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2;
       legion.x = source.cx + (target.cx - source.cx) * eased;
       legion.y = source.cy + (target.cy - source.cy) * eased;
@@ -363,6 +464,14 @@
     }
     el.playerRegions.textContent = playerCount;
     el.enemyRegions.textContent = enemyCount;
+    el.territoryBar.style.setProperty('--player-share', `${playerCount / state.regions.size * 100}%`);
+    el.territoryBar.style.setProperty('--enemy-share', `${enemyCount / state.regions.size * 100}%`);
+    const ability = ABILITIES[state.ability];
+    const cooldown = Math.max(0, Math.ceil((state.abilityReadyAt - performance.now()) / 1000));
+    el.abilityBtn.disabled = !state.started || state.ended || cooldown > 0;
+    el.abilityBtn.classList.toggle('armed', state.targetingAbility);
+    el.abilityBtn.textContent = `${ability.icon} ${ability.name}${cooldown ? ' · ' + cooldown + ' s' : state.targetingAbility ? ' · Zielfeld wählen' : ''}`;
+    el.abilityBtn.title = `${ability.description} 60 Sekunden Abklingzeit. Anklicken, dann Zielfeld wählen.`;
 
     const elapsed = state.started ? Math.max(0, (state.endTime ?? performance.now()) - state.startTime) : 0;
     const seconds = Math.floor(elapsed / 1000);
@@ -376,16 +485,16 @@
     }
     const r = state.regions.get(state.selectedId);
     const ownerLabel = r.owner === OWNER.PLAYER ? 'Du' : r.owner === OWNER.ENEMY ? 'KI' : 'Neutral';
-    const rate = r.recruitmentRate.toFixed(2).replace('.', ',');
-    el.selectedInfo.innerHTML = `<b>${r.name}</b><br>${ownerLabel} · ${Math.floor(r.soldiers)}/${r.capacity} Soldaten<br>Rekrutierung: ${r.owner === OWNER.NEUTRAL ? '0' : rate} / Sek.`;
+    const rate = (r.special === 'volcano' ? 0 : r.isStart ? 1 / 3 : r.capacity / 20).toFixed(2).replace('.', ',');
+    el.selectedInfo.innerHTML = `<b>${r.name}</b><br>${ownerLabel} · ${Math.floor(r.soldiers)}/${r.capacity} Soldaten<br>Rekrutierung: ${r.owner === OWNER.NEUTRAL ? '0' : rate} / Sek.${r.special ? `<br><b>${SPECIAL[r.special].icon} ${SPECIAL[r.special].name}</b><br>${SPECIAL[r.special].description}` : ''}`;
   }
 
   function checkEndState() {
     if (state.ended) return;
     const playerRegions = [...state.regions.values()].filter(r => r.owner === OWNER.PLAYER).length;
     const enemyRegions = [...state.regions.values()].filter(r => r.owner === OWNER.ENEMY).length;
-    const playerLegions = state.legions.some(l => l.owner === OWNER.PLAYER);
-    const enemyLegions = state.legions.some(l => l.owner === OWNER.ENEMY);
+    const playerLegions = state.legions.some(l => !l.arrived && l.owner === OWNER.PLAYER);
+    const enemyLegions = state.legions.some(l => !l.arrived && l.owner === OWNER.ENEMY);
 
     if (enemyRegions === 0 && !enemyLegions) endGame(true);
     else if (playerRegions === 0 && !playerLegions) endGame(false);
@@ -394,6 +503,9 @@
   function endGame(won) {
     state.ended = true;
     state.endTime = performance.now();
+    state.drag = null;
+    el.dragArrow.classList.add('hidden');
+    el.setup.hidden = true;
     updateHUD();
     el.overlayKicker.textContent = won ? 'MISSION ERFÜLLT' : 'MISSION GESCHEITERT';
     el.overlayTitle.textContent = won ? 'Sieg!' : 'Niederlage';
@@ -420,14 +532,37 @@
     toastTimer = setTimeout(() => el.toast.classList.remove('show'), 1500);
   }
 
+  function activateAbility() {
+    if (!state.started || state.ended || performance.now() < state.abilityReadyAt) return;
+    state.targetingAbility = !state.targetingAbility;
+    clearSelection();
+    showToast(state.targetingAbility ? (state.ability === 'strike' ? 'Wähle ein rotes Feld.' : 'Wähle ein grünes Feld.') : 'Fähigkeit abgewählt.');
+    updateHUD();
+  }
+
+  function applyAbility(target) {
+    const now = performance.now();
+    if (!state.started || state.ended || now < state.abilityReadyAt) return;
+    const expectedOwner = state.ability === 'strike' ? OWNER.ENEMY : OWNER.PLAYER;
+    if (target.owner !== expectedOwner) { showToast(expectedOwner === OWNER.ENEMY ? 'Wähle ein rotes Feld.' : 'Wähle ein grünes Feld.'); return; }
+    if (state.ability === 'capacity') target.capacity += 15;
+    if (state.ability === 'reinforcement') target.soldiers += 15;
+    if (state.ability === 'strike') target.soldiers = Math.max(0, target.soldiers - 15);
+    state.abilityReadyAt = now + 60000;
+    state.targetingAbility = false;
+    showToast(`${ABILITIES[state.ability].name}: ${target.name}`);
+    refreshAll();
+  }
+
   function startGame() {
     if (state.started && !state.ended) return;
-    if (state.ended) resetState();
+    if (state.ended) { resetState(); return; }
     const now = performance.now();
     state.started = true;
     state.startTime = now;
     state.lastFrame = now;
     state.lastAI = now;
+    state.ability = document.querySelector('input[name=ability]:checked').value;
     el.overlay.classList.add('hidden');
     updateHUD();
   }
@@ -439,7 +574,7 @@
       updateLegions(now);
       aiTick(now);
       for (const r of state.regions.values()) {
-        r.dom.soldiers.textContent = Math.floor(r.soldiers);
+        refreshRegion(r);
       }
       updateHUD();
       updateSelectedInfo();
@@ -451,7 +586,15 @@
 
   el.restartBtn.addEventListener('click', resetState);
   el.overlayRestart.addEventListener('click', startGame);
-  document.addEventListener('pointerup', () => { state.pointerSourceId = null; });
+  document.addEventListener('pointermove', moveDrag);
+  document.addEventListener('pointerup', e => finishDrag(e));
+  document.addEventListener('pointercancel', e => finishDrag(e, true));
+  el.difficulty.addEventListener('change', () => {
+    if (state.started && !state.ended) return;
+    state.difficulty = el.difficulty.value;
+    resetState();
+  });
+  el.abilityBtn.addEventListener('click', activateAbility);
 
   resetState();
   requestAnimationFrame(frame);

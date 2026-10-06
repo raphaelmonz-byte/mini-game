@@ -100,3 +100,76 @@ button { font: inherit; }
   .side-panel { grid-template-columns: 1fr; }
   .side-panel section + section { border-left: 0; border-top: 1px solid var(--line); padding-left: 0; padding-top: 18px; }
 }
+
+/* Parchment campaign map, with enamel territories and inked coastlines. */
+:root { color-scheme: light; --text: #392b1d; --muted: #766348; --line: #8e714547; --player: #53df38; --player-dark: #277623; --enemy: #ef4947; --enemy-dark: #942725; --neutral: #bba171; --neutral-dark: #796239; }
+html, body { background: radial-gradient(ellipse at 45% 25%, #eee2c5, #b49a73); color: var(--text); }
+body { min-height: 100vh; font-family: Georgia, 'Times New Roman', serif; }
+button, select, input { font-family: system-ui, sans-serif; }
+.app-shell { padding-top: 18px; }
+.topbar { margin-bottom: 14px; }
+.topbar h1 { font-size: 36px; letter-spacing: -.04em; text-shadow: 0 1px #fff5; }
+.title-sub { display: block; font-size: 13px; font-weight: normal; letter-spacing: .15em; margin-top: 4px; text-transform: uppercase; }
+.eyebrow { color: #89602d; letter-spacing: .15em; }
+.pill { background: #f8ebcb8c; color: #493723; border-color: #88684155; font-family: system-ui, sans-serif; }
+.secondary-btn { color: #4a3421; background: #e4cf9f; border: 1px solid #8d693d; }
+.primary-btn, .ability-button { background: linear-gradient(#ffe2a0, #d6a247); color: #4d3019; border: 2px solid #997138; box-shadow: 0 3px 0 #725028, inset 0 1px #fff8; padding: 12px 18px; font-weight: 800; border-radius: 9px; cursor: pointer; }
+.ability-button:disabled { opacity: .55; cursor: default; box-shadow: none; }
+.ability-button.armed { outline: 3px solid #fff5b9; animation: abilityPulse 1s ease-in-out infinite alternate; }
+@keyframes abilityPulse { to { box-shadow: 0 0 18px #ffec83; } }
+.territory-bar { height: 12px; margin: 0 0 18px; border: 3px solid #685130; border-radius: 3px; background: #ab9060; box-shadow: 0 2px 4px #59452944; overflow: hidden; }
+.territory-bar span { display: block; height: 100%; background: linear-gradient(to right, #42d72a 0 var(--player-share, 8.33%), #ea4142 var(--player-share, 8.33%) calc(var(--player-share, 8.33%) + var(--enemy-share, 16.67%)), #bba171 0); transition: background .3s; }
+.game-card { background: #d8c399; border: 2px solid #9f8055; border-radius: 12px; box-shadow: 0 16px 50px #4b351b35; backdrop-filter: none; }
+.map-wrap { background: radial-gradient(ellipse, #eee1bf 15%, #d6bc8f 70%, #b49a73); padding: 12px; }
+.map-bg { fill: #dcc79e; stroke: #8c6f4040; filter: url(#paperGrain); }
+.connection { stroke: #705d3d; stroke-width: 3; stroke-dasharray: 2 12; opacity: .28; }
+.region-border { fill: #e9d8ab; stroke: #79623e; stroke-width: 17; stroke-linejoin: round; filter: drop-shadow(0 3px 2px #60431e55); }
+.region-shape { stroke-width: 5; }
+.region-label-bg { fill: #382e23c4; stroke: #e3cd9866; stroke-width: 3; pointer-events: none; }
+.region-soldiers { font-size: 29px; }
+.region-capacity { fill: #302517; font-size: 17px; font-weight: 900; }
+.region-name { fill: #493921; font-size: 12px; font-family: Georgia, serif; }
+.region-group.selected .region-shape { stroke: #fff2ad !important; filter: drop-shadow(0 0 5px #fff49b); }
+.region-group.valid-target .region-shape { stroke: #f4e5b0 !important; }
+.region-group:focus-visible { outline: none; }
+.region-group:focus-visible .region-shape { stroke: white; }
+.special-icon { fill: #fff5d7; font-size: 26px; font-weight: bold; text-anchor: middle; paint-order: stroke; stroke: #594020; stroke-width: 3; pointer-events: none; }
+.region-shape.owner-neutral.volcano { fill: #d39053; }
+.region-shape.castle { stroke-dasharray: 9 3; }
+.region-shape.shrine { filter: drop-shadow(0 0 3px #fff2ae); }
+.legion-line { stroke-width: 4; opacity: .75; stroke-dasharray: 8 10; animation: arrowMarch .65s linear infinite; pointer-events: none; }
+.legion-dot, .legion-count, #legions { pointer-events: none; }
+.teleport-line { stroke: #8061ae; stroke-dasharray: 3 14; animation-duration: .25s; }
+.drag-arrow { stroke: #fff1ae; stroke-width: 7; fill: none; stroke-linecap: round; stroke-dasharray: 16 10; filter: drop-shadow(0 2px 2px #533d1e); pointer-events: none; animation: arrowMarch .5s linear infinite; }
+.drag-arrow.invalid { stroke: #d67558; opacity: .75; }
+.hidden { display: none; }
+@keyframes arrowMarch { to { stroke-dashoffset: -26; } }
+.side-panel { background: linear-gradient(#eadab6, #d1ba8f); border-color: #91734655; gap: 22px; padding: 22px; }
+.side-panel p, .mini-rule, .legend-row { color: #55452e; }
+.side-panel h2 { font-size: 20px; }
+.mini-rule span { background: #9d7a3940; }
+.legend-icon { color: #4d3824; }
+.selected-info { background: #f8eac770; color: #4e3b26; border-color: #a5814c66; }
+.site-rule { display: flex; flex-direction: column; gap: 3px; font-size: 14px; margin: 0 0 12px; }
+.site-rule b { color: #65472a; }
+.site-rule span { color: #67553b; line-height: 1.4; }
+.overlay { background: #5643267a; backdrop-filter: blur(2px); inset: 12px; border-radius: 10px; }
+.overlay-card { background: linear-gradient(#f5e6be, #dcc18f); border: 3px double #8f6d3b; color: #49331f; box-shadow: 0 16px 60px #4c301966; padding: 24px; width: min(470px, calc(100% - 24px)); max-height: calc(100% - 16px); overflow-y: auto; border-radius: 10px; }
+.overlay-card h2 { font-size: 34px; margin: 4px 0; }
+.overlay-card p { color: #6d5538; font-size: 14px; margin-bottom: 14px; }
+.round-setup[hidden] { display: none; }
+.round-setup { text-align: left; margin-bottom: 18px; }
+.difficulty-label { display: block; font-weight: bold; margin-bottom: 6px; }
+#difficulty { width: 100%; padding: 9px; color: #49331f; background: #f8ebcc; border: 1px solid #a4834a; border-radius: 6px; font-size: 13px; }
+.ability-choices { border: 0; padding: 0; margin: 16px 0 0; }
+.ability-choices legend { font-weight: bold; font-size: 14px; margin-bottom: 8px; }
+.ability-choices label { display: flex; align-items: center; gap: 9px; padding: 9px 10px; margin: 6px 0; border: 1px solid #ae8c5066; border-radius: 6px; background: #fff4d430; cursor: pointer; }
+.ability-choices label:has(input:checked) { background: #fff1b9; border-color: #9d773a; box-shadow: inset 3px 0 #9d773a; }
+.ability-choices input { accent-color: #805927; }
+.ability-choices span { display: grid; gap: 3px; }
+.ability-choices small { font-size: 12px; color: #786041; }
+@media (max-width: 720px) { .map-wrap { overflow: hidden; padding: 4px; } #gameMap { min-width: 0; width: 100%; height: min(76vh, 620px); } .overlay { inset: 4px; } .overlay-card { padding: 16px; } .topbar h1 { font-size: 30px; } .ability-button { padding: 10px 12px; font-size: 12px; } }
+@media (prefers-reduced-motion: reduce) { .drag-arrow, .legion-line, .ability-button.armed { animation: none; } }
+
+.mini-rule > span { color: #70502b; }
+.region-group:focus { outline: none; }

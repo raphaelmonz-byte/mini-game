@@ -1,38 +1,42 @@
-# Territory – Browser-Prototyp v0.1
+# Territory – Browser-Spiel
 
-Ein bewusst kleiner spielbarer Prototyp für ein Echtzeit-Territory-Control-Spiel, inspiriert vom beschriebenen Minigame-Prinzip.
+Ein Territory-Control-Spiel mit Pergamentkarte, organischen Gebieten und Echtzeitkämpfen.
 
-## Start
+## Start und Steuerung
 
-1. Ordner entpacken.
-2. `index.html` doppelklicken.
-3. Das Spiel läuft direkt im Browser – kein Server und keine Installation nötig.
-4. Auf „Spiel starten“ in der Kartenmitte klicken. Während der Partie gibt es keine Pause.
+- `index.html` im Browser öffnen; keine Installation erforderlich.
+- Vor Rundenbeginn Schwierigkeit und eine der drei Fähigkeiten wählen, dann „Spiel starten“ anklicken.
+- Ein eigenes grünes Feld und anschließend ein Nachbarfeld anklicken, oder zwischen den Feldern ziehen. Der animierte Pfeil zeigt die Zugrichtung.
+- Es werden 50 % der verfügbaren Soldaten entsendet. Die Runde läuft ohne Pause; „Neu starten“ führt zurück zur Rundenauswahl.
+- Große Zahl: aktive Soldaten. „Kap.“: Feldkapazität. Das Symbol darunter kennzeichnet Spezialfelder.
 
-## Steuerung
+## Fähigkeiten
 
-- Eigene (grüne) Region anklicken, danach eine angrenzende Zielregion anklicken.
-- Alternativ mit der Maus von einer grünen Region auf das Ziel ziehen.
-- Es werden jeweils 50 % der aktuell sichtbaren Soldaten entsendet.
+Eine Fähigkeit wird für die Runde gewählt. Sie ist ab Start bereit und nach jedem erfolgreichen Einsatz 60 Sekunden gesperrt. Den Fähigkeitsknopf anklicken und danach ein passendes Zielfeld wählen. Bei jedem Einsatz darf ein anderes Feld gewählt werden. Ein erneuter Klick auf den Fähigkeitsknopf bricht die Zielauswahl ab.
 
-## Regeln v0.1
+- **Ausbau:** dauerhaft +15 Kapazität auf einem eigenen Feld.
+- **Verstärkung:** +15 Soldaten auf einem eigenen Feld, auch über dessen Kapazität hinaus. Automatische Produktion setzt erst unterhalb der Kapazität wieder ein.
+- **Schlag:** −15 Soldaten auf einem feindlichen Feld, mindestens 0. Das Feld wird dadurch nicht automatisch erobert.
 
-- Besetzte Regionen rekrutieren automatisch.
-- Startfelder (Spieler und KI) produzieren 1 Soldaten alle 3 Sekunden bis zur Kapazität.
-- Andere besetzte Felder rekrutieren pro Sekunde `Kapazität / 20`.
-- Alle Felder zeigen aktive Soldaten und darunter „Kap.“ mit ihrer Kapazität.
-- Neutrale Regionen rekrutieren nicht.
-- Eigene Legion auf eigene Region = Verstärkung.
-- Legion auf neutrale/feindliche Region = Kampf.
-- Kampf: Angreifer minus Verteidiger; der Überlebende behält/erobert die Region.
-- Sieg: Keine KI-Region und keine KI-Legion mehr vorhanden.
-- Niederlage: Keine Spielerregion und keine Spielerlegion mehr vorhanden.
+## Felder und Schwierigkeit
 
-## Nächste sinnvolle Schritte
+- **Vulkan ♨:** verliert unabhängig vom Besitzer 1 Soldaten pro Sekunde bis 0 und produziert keine Soldaten.
+- **Burg ♜:** vernichtet 2 angreifende Soldaten pro Sekunde während ihres Anmarschs. Eigene Verstärkungen und Teleportationen werden nicht beschossen.
+- **Schrein ◎:** erlaubt Truppentransfers zu jedem anderen Schrein, unabhängig von Nachbarschaft und Besitzer. Ankunft nach einer kurzen Teleportanimation; am Ziel gelten die normalen Kampfregeln.
+- **Grenzland:** 2 Schreine, langsamere KI.
+- **Gefahrenland:** 2 Schreine, 1 Vulkan, 1 Burg.
+- **Feuerland:** 2 Schreine, 3 Vulkane, 2 Burgen, schnellere KI.
 
-- Karten-/Levelsystem als JSON
-- bessere KI und Schwierigkeitsgrade
-- Spezialfelder: Schrein, Vulkan, Festung
-- strategische Fähigkeiten
-- mehrere KI-Spieler/Farben
-- Sound, Effekte, organischere Kartenoptik
+Startfelder bleiben normale Felder und produzieren 1 Soldaten alle 3 Sekunden. Andere besetzte normale Felder produzieren Kapazität / 20 Soldaten pro Sekunde. Neutrale Felder produzieren nicht. Automatische Produktion endet an der Kapazität.
+
+Eigene Truppen verstärken eigene Felder bis zur Kapazität, ohne vorhandene überzählige Soldaten zu entfernen. Bei feindlichen oder neutralen Feldern werden Angreifer und Verteidiger gegeneinander verrechnet. Sieg: keine KI-Felder und keine KI-Truppen mehr vorhanden; Niederlage entsprechend für den Spieler.
+
+## Entwicklung und Tests
+
+Optionaler lokaler Server: `python3 -m http.server 8000` im Projektordner.
+
+Die Logiktests benötigen Node.js und keine weiteren Pakete:
+
+```sh
+node --test tests/game.test.cjs
+```

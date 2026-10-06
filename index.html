@@ -3,28 +3,34 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Territory Prototype v0.1</title>
+  <title>Territory – Feldzug</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="app-shell">
     <header class="topbar">
       <div>
-        <div class="eyebrow">PROTOTYP v0.1</div>
-        <h1>Territory</h1>
+        <div class="eyebrow">DER FELDZUG</div>
+        <h1>Territory <span class="title-sub">Reiche im Wandel</span></h1>
       </div>
       <div class="status-cluster">
         <div class="pill"><span class="dot player-dot"></span><span id="playerRegions">0</span> Regionen</div>
         <div class="pill"><span class="dot enemy-dot"></span><span id="enemyRegions">0</span> KI-Regionen</div>
         <div class="pill"><span id="timer">00:00</span></div>
+        <button id="abilityBtn" class="ability-button" disabled>Fähigkeit</button>
         <button id="restartBtn" class="secondary-btn">Neu starten</button>
       </div>
     </header>
 
+    <div id="territoryBar" class="territory-bar" aria-label="Anteile der Spieler- und KI-Regionen"><span></span></div>
     <section class="game-card">
       <div class="map-wrap" id="mapWrap">
         <svg id="gameMap" viewBox="0 0 1200 700" role="img" aria-label="Spielkarte mit Regionen">
           <defs>
+            <marker id="arrowHead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#fff1ae"/></marker>
+            <marker id="marchHead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="3" markerHeight="3" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#695032"/></marker>
+            <pattern id="mapGrid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0 H0 V80" fill="none" stroke="#80643b" stroke-opacity=".12" stroke-width="1"/></pattern>
+            <filter id="paperGrain"><feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="3" seed="7"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope=".13"/></feComponentTransfer><feBlend in="SourceGraphic" mode="multiply"/></filter>
             <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
               <feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity="0.2"/>
             </filter>
@@ -34,9 +40,11 @@
             </filter>
           </defs>
           <rect width="1200" height="700" class="map-bg" rx="28"/>
+          <rect width="1200" height="700" fill="url(#mapGrid)" pointer-events="none"/>
           <g id="connections"></g>
           <g id="regions"></g>
           <g id="legions"></g>
+          <path id="dragArrow" class="drag-arrow hidden" marker-end="url(#arrowHead)"/>
         </svg>
 
         <div id="toast" class="toast" aria-live="polite"></div>
@@ -45,6 +53,15 @@
             <div id="overlayKicker" class="eyebrow">BEREIT?</div>
             <h2 id="overlayTitle">Territory</h2>
             <p id="overlayText"></p>
+            <div id="roundSetup" class="round-setup">
+              <label class="difficulty-label" for="difficulty">Schwierigkeit</label>
+              <select id="difficulty"><option value="easy">I · Grenzland — 2 Schreine</option><option value="medium">II · Gefahrenland — 4 Spezialfelder</option><option value="hard">III · Feuerland — 7 Spezialfelder</option></select>
+              <fieldset class="ability-choices"><legend>Wähle deine Fähigkeit · alle 60 Sekunden</legend>
+                <label><input type="radio" name="ability" value="capacity" checked/><span><b>♜ Ausbau</b><small>+15 Kapazität auf einem eigenen Feld</small></span></label>
+                <label><input type="radio" name="ability" value="reinforcement"/><span><b>✚ Verstärkung</b><small>+15 Soldaten auf einem eigenen Feld</small></span></label>
+                <label><input type="radio" name="ability" value="strike"/><span><b>ϟ Schlag</b><small>−15 Soldaten auf einem feindlichen Feld</small></span></label>
+              </fieldset>
+            </div>
             <button id="overlayRestart" class="primary-btn">Spiel starten</button>
           </div>
         </div>
@@ -54,9 +71,9 @@
         <section>
           <h2>So spielst du</h2>
           <p>Klicke eine eigene Region an und danach eine angrenzende Region. Alternativ kannst du direkt von einer eigenen Region auf ein Ziel ziehen.</p>
-          <div class="mini-rule"><span>①</span><b>50 %</b> der verfügbaren Soldaten werden entsendet.</div>
-          <div class="mini-rule"><span>②</span>Besetzte Regionen rekrutieren automatisch.</div>
-          <div class="mini-rule"><span>③</span>Erobere alle roten Regionen.</div>
+          <div class="mini-rule"><span>1</span><div><b>50 %</b> der verfügbaren Soldaten werden entsendet.</div></div>
+          <div class="mini-rule"><span>2</span><div>Fähigkeit anklicken, dann das gewünschte Zielfeld.</div></div>
+          <div class="mini-rule"><span>3</span><div>Erobere alle roten Regionen. Keine Pause.</div></div>
         </section>
 
         <section class="legend-section">
@@ -69,8 +86,11 @@
         </section>
 
         <section>
-          <h2>Balance v0.1</h2>
-          <p class="muted">Rekrutierung pro Sekunde = Kapazität ÷ 20 auf eroberten Feldern. Startfelder: 1 Soldat alle 3 Sekunden. Neutrale Regionen rekrutieren nicht.</p>
+          <h2>Besondere Orte</h2>
+          <div class="site-rule"><b>♨ Vulkan</b><span>−1 Soldat / Sek. bis 0. Keine Produktion.</span></div>
+          <div class="site-rule"><b>♜ Burg</b><span>−2 angreifende Soldaten / Sek. beim Anmarsch.</span></div>
+          <div class="site-rule"><b>◎ Schrein</b><span>Truppen zu einem anderen Schrein teleportieren.</span></div>
+          <p class="muted">Startfelder: 1 Soldat / 3 Sek. Andere besetzte Felder: Kapazität ÷ 20 / Sek.</p>
           <div id="selectedInfo" class="selected-info">Wähle eine Region aus.</div>
         </section>
       </aside>

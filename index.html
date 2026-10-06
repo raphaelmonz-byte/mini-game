@@ -17,7 +17,6 @@
         <div class="pill"><span class="dot player-dot"></span><span id="playerRegions">0</span> Regionen</div>
         <div class="pill"><span class="dot enemy-dot"></span><span id="enemyRegions">0</span> KI-Regionen</div>
         <div class="pill"><span id="timer">00:00</span></div>
-        <button id="pauseBtn" class="secondary-btn">Pause</button>
         <button id="restartBtn" class="secondary-btn">Neu starten</button>
       </div>
     </header>
@@ -41,12 +40,12 @@
         </svg>
 
         <div id="toast" class="toast" aria-live="polite"></div>
-        <div id="overlay" class="overlay hidden">
+        <div id="overlay" class="overlay">
           <div class="overlay-card">
-            <div id="overlayKicker" class="eyebrow">SPIELENDE</div>
-            <h2 id="overlayTitle">Sieg</h2>
+            <div id="overlayKicker" class="eyebrow">BEREIT?</div>
+            <h2 id="overlayTitle">Territory</h2>
             <p id="overlayText"></p>
-            <button id="overlayRestart" class="primary-btn">Noch einmal</button>
+            <button id="overlayRestart" class="primary-btn">Spiel starten</button>
           </div>
         </div>
       </div>
@@ -71,7 +70,7 @@
 
         <section>
           <h2>Balance v0.1</h2>
-          <p class="muted">Rekrutierung pro Sekunde = Kapazität ÷ 20. Neutrale Regionen rekrutieren nicht.</p>
+          <p class="muted">Rekrutierung pro Sekunde = Kapazität ÷ 20 auf eroberten Feldern. Startfelder: 1 Soldat alle 3 Sekunden. Neutrale Regionen rekrutieren nicht.</p>
           <div id="selectedInfo" class="selected-info">Wähle eine Region aus.</div>
         </section>
       </aside>

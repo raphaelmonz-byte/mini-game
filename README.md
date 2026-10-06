@@ -7,6 +7,7 @@ Ein bewusst kleiner spielbarer Prototyp für ein Echtzeit-Territory-Control-Spie
 1. Ordner entpacken.
 2. `index.html` doppelklicken.
 3. Das Spiel läuft direkt im Browser – kein Server und keine Installation nötig.
+4. Auf „Spiel starten“ in der Kartenmitte klicken. Während der Partie gibt es keine Pause.
 
 ## Steuerung
 
@@ -17,7 +18,9 @@ Ein bewusst kleiner spielbarer Prototyp für ein Echtzeit-Territory-Control-Spie
 ## Regeln v0.1
 
 - Besetzte Regionen rekrutieren automatisch.
-- Rekrutierung pro Sekunde = `Kapazität / 20`.
+- Startfelder (Spieler und KI) produzieren 1 Soldaten alle 3 Sekunden bis zur Kapazität.
+- Andere besetzte Felder rekrutieren pro Sekunde `Kapazität / 20`.
+- Alle Felder zeigen aktive Soldaten und darunter „Kap.“ mit ihrer Kapazität.
 - Neutrale Regionen rekrutieren nicht.
 - Eigene Legion auf eigene Region = Verstärkung.
 - Legion auf neutrale/feindliche Region = Kampf.

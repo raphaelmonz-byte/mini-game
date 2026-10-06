@@ -22,11 +22,10 @@
     legions: [],
     selectedId: null,
     pointerSourceId: null,
-    paused: false,
+    started: false,
     ended: false,
     startTime: performance.now(),
-    pausedAt: 0,
-    accumulatedPause: 0,
+    endTime: null,
     lastFrame: performance.now(),
     lastAI: 0,
     legionSeq: 1,
@@ -41,7 +40,6 @@
     timer: document.getElementById('timer'),
     toast: document.getElementById('toast'),
     selectedInfo: document.getElementById('selectedInfo'),
-    pauseBtn: document.getElementById('pauseBtn'),
     restartBtn: document.getElementById('restartBtn'),
     overlay: document.getElementById('overlay'),
     overlayTitle: document.getElementById('overlayTitle'),
@@ -61,20 +59,26 @@
     state.legions = [];
     state.selectedId = null;
     state.pointerSourceId = null;
-    state.paused = false;
+    state.started = false;
     state.ended = false;
     state.startTime = performance.now();
-    state.pausedAt = 0;
-    state.accumulatedPause = 0;
+    state.endTime = null;
     state.lastFrame = performance.now();
     state.lastAI = 0;
     state.legionSeq = 1;
-    el.pauseBtn.textContent = 'Pause';
-    el.overlay.classList.add('hidden');
+    clearTimeout(toastTimer);
+    el.toast.classList.remove('show');
+    el.overlayKicker.textContent = 'BEREIT?';
+    el.overlayTitle.textContent = 'Territory';
+    el.overlayText.textContent = 'Erobere alle roten Regionen. Die Partie läuft ohne Pause.';
+    el.overlayRestart.textContent = 'Spiel starten';
+    el.overlay.classList.remove('hidden');
 
     for (const def of regionDefs) {
       state.regions.set(def.id, {
         ...def,
+        capacity: def.cap,
+        recruitmentRate: def.owner === OWNER.NEUTRAL ? def.cap / 20 : 1 / 3,
         soldiers: def.soldiers,
         owner: def.owner,
         dom: null,
@@ -124,7 +128,7 @@
   }
 
   function onRegionPointerDown(e, id) {
-    if (state.paused || state.ended) return;
+    if (!state.started || state.ended) return;
     const r = state.regions.get(id);
     if (r.owner === OWNER.PLAYER) {
       state.pointerSourceId = id;
@@ -136,7 +140,7 @@
   }
 
   function onRegionPointerUp(_e, id) {
-    if (state.paused || state.ended) return;
+    if (!state.started || state.ended) return;
     if (!state.pointerSourceId || state.pointerSourceId === id) return;
     const sourceId = state.pointerSourceId;
     state.pointerSourceId = null;
@@ -144,7 +148,7 @@
   }
 
   function onRegionClick(_e, id) {
-    if (state.paused || state.ended) return;
+    if (!state.started || state.ended) return;
     const clicked = state.regions.get(id);
 
     if (!state.selectedId) {
@@ -273,7 +277,7 @@
     for (const r of state.regions.values()) {
       if (r.owner === OWNER.NEUTRAL) continue;
       if (r.soldiers >= r.capacity) { r.soldiers = r.capacity; continue; }
-      r.soldiers = Math.min(r.capacity, r.soldiers + (r.capacity / 20) * dtSeconds);
+      r.soldiers = Math.min(r.capacity, r.soldiers + r.recruitmentRate * dtSeconds);
     }
   }
 
@@ -317,8 +321,8 @@
     const ownerClass = `owner-${r.owner}`;
     r.dom.path.setAttribute('class', `region-shape ${ownerClass}`);
     r.dom.soldiers.textContent = Math.floor(r.soldiers);
-    r.dom.capacity.textContent = r.capacity;
-    r.dom.capacity.setAttribute('fill', r.owner === OWNER.NEUTRAL ? '#15130f' : '#071118');
+    r.dom.capacity.textContent = `Kap. ${r.capacity}`;
+    r.dom.g.setAttribute('aria-label', `${r.name}: ${Math.floor(r.soldiers)} Soldaten, Kapazität ${r.capacity}`);
   }
 
   function refreshAll() {
@@ -360,8 +364,7 @@
     el.playerRegions.textContent = playerCount;
     el.enemyRegions.textContent = enemyCount;
 
-    const effectiveNow = state.paused ? state.pausedAt : performance.now();
-    const elapsed = Math.max(0, effectiveNow - state.startTime - state.accumulatedPause);
+    const elapsed = state.started ? Math.max(0, (state.endTime ?? performance.now()) - state.startTime) : 0;
     const seconds = Math.floor(elapsed / 1000);
     el.timer.textContent = `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
   }
@@ -373,7 +376,7 @@
     }
     const r = state.regions.get(state.selectedId);
     const ownerLabel = r.owner === OWNER.PLAYER ? 'Du' : r.owner === OWNER.ENEMY ? 'KI' : 'Neutral';
-    const rate = (r.capacity / 20).toFixed(1).replace('.', ',');
+    const rate = r.recruitmentRate.toFixed(2).replace('.', ',');
     el.selectedInfo.innerHTML = `<b>${r.name}</b><br>${ownerLabel} · ${Math.floor(r.soldiers)}/${r.capacity} Soldaten<br>Rekrutierung: ${r.owner === OWNER.NEUTRAL ? '0' : rate} / Sek.`;
   }
 
@@ -390,13 +393,14 @@
 
   function endGame(won) {
     state.ended = true;
-    state.paused = true;
+    state.endTime = performance.now();
     updateHUD();
     el.overlayKicker.textContent = won ? 'MISSION ERFÜLLT' : 'MISSION GESCHEITERT';
     el.overlayTitle.textContent = won ? 'Sieg!' : 'Niederlage';
     el.overlayText.textContent = won
       ? `Du hast alle feindlichen Regionen in ${el.timer.textContent} ausgeschaltet.`
       : 'Die KI hat deine letzte Region erobert.';
+    el.overlayRestart.textContent = 'Noch einmal';
     el.overlay.classList.remove('hidden');
   }
 
@@ -416,25 +420,20 @@
     toastTimer = setTimeout(() => el.toast.classList.remove('show'), 1500);
   }
 
-  function togglePause() {
-    if (state.ended) return;
+  function startGame() {
+    if (state.started && !state.ended) return;
+    if (state.ended) resetState();
     const now = performance.now();
-    if (!state.paused) {
-      state.paused = true;
-      state.pausedAt = now;
-      el.pauseBtn.textContent = 'Weiter';
-    } else {
-      state.paused = false;
-      state.accumulatedPause += now - state.pausedAt;
-      const pauseDelta = now - state.pausedAt;
-      for (const l of state.legions) l.start += pauseDelta;
-      state.lastFrame = now;
-      el.pauseBtn.textContent = 'Pause';
-    }
+    state.started = true;
+    state.startTime = now;
+    state.lastFrame = now;
+    state.lastAI = now;
+    el.overlay.classList.add('hidden');
+    updateHUD();
   }
 
   function frame(now) {
-    if (!state.paused && !state.ended) {
+    if (state.started && !state.ended) {
       const dt = Math.min(0.05, (now - state.lastFrame) / 1000);
       recruitmentTick(dt);
       updateLegions(now);
@@ -450,9 +449,8 @@
     requestAnimationFrame(frame);
   }
 
-  el.pauseBtn.addEventListener('click', togglePause);
   el.restartBtn.addEventListener('click', resetState);
-  el.overlayRestart.addEventListener('click', resetState);
+  el.overlayRestart.addEventListener('click', startGame);
   document.addEventListener('pointerup', () => { state.pointerSourceId = null; });
 
   resetState();
